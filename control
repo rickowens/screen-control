@@ -1,0 +1,41 @@
+#!/usr/bin/python
+
+import termios, fcntl, sys, os
+import subprocess
+fd = sys.stdin.fileno()
+
+oldterm = termios.tcgetattr(fd)
+newattr = termios.tcgetattr(fd)
+newattr[3] = newattr[3] & ~termios.ICANON & ~termios.ECHO
+termios.tcsetattr(fd, termios.TCSANOW, newattr)
+
+oldflags = fcntl.fcntl(fd, fcntl.F_GETFL)
+fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
+
+
+CONTROL_C = '\x03'
+CONTROL_D = '\x04'
+
+# choose a different exit char if you want ^D's to be sent across.
+EXIT_CHAR = CONTROL_D
+
+def read():
+    while True:
+        try:
+            c = sys.stdin.read(1)
+            if c == EXIT_CHAR:
+                return ''
+            else:
+                return c
+        except KeyboardInterrupt:
+            return CONTROL_C
+
+try:
+    c = read()
+    while c:
+        for window in sys.argv[1:]:
+            subprocess.call(['screen', '-p', window, '-X', 'stuff', c])
+        c = read()
+finally:
+    termios.tcsetattr(fd, termios.TCSAFLUSH, oldterm)
+    fcntl.fcntl(fd, fcntl.F_SETFL, oldflags)
